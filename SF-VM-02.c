@@ -41,10 +41,16 @@ typedef int(*opcode_function_t)(unsigned char, unsigned char);
 #define OPCODE_SLM  30
 #define OPCODE_SRM  31
 #define OPCODE_NTM  32
+#define OPCODE_PSH  33
+#define OPCODE_POP  34
+#define OPCODE_CAL  35
+#define OPCODE_RET  36
 
 #define DATA_SIZE             10
+#define CODE_AMOUNT           9
+#define STACK_SIZE            10
 #define PROGRAM_SIZE          sizeof(memory)
-#define INSTRUCTIONS_COUNT    33
+#define INSTRUCTIONS_COUNT    37
 #define INSTRUCTION_SIZE      3
 
 #define LEFT_OPERAND  IP + 1
@@ -54,6 +60,8 @@ typedef int(*opcode_function_t)(unsigned char, unsigned char);
 
 
 static unsigned char memory [] = {
+
+  /*Data segment*/
   /* 00 */  0,
   /* 01 */  0,
   /* 02 */  0,
@@ -64,8 +72,11 @@ static unsigned char memory [] = {
   /* 07 */  0,
   /* 08 */  0,
   /* 09 */  0,
+  /*Data segment*/
+
+  /*Code segment*/
   /* 10 */  0,  9,   7,    /* ADD  9,   7   */
-  /* 11 */  1,  8,   4,    /* SUB  8,   4   */
+  /* 13 */  1,  8,   4,    /* SUB  8,   4   */
   /* 12 */  2,  2,   5,    /* MUL  2,   5   */
   /* 13 */  22, 5,   10,    /* MUL  2,   5   */
   /* 14 */  23, 5,   4,    /* MUL  2,   5   */
@@ -73,15 +84,29 @@ static unsigned char memory [] = {
   /* 16 */  25, 5,   2,    /* MUL  2,   5   */
   /* 13 */  22, 5,   10,    /* MUL  2,   5   */
   /* 13 */  26, 5,   2,    /* MUL  2,   5   */
+  /*Code segment*/
 
-
+  /*Stack segment*/
+  /* 01 */  0,
+  /* 02 */  0,
+  /* 03 */  0,
+  /* 04 */  0,
+  /* 05 */  0,
+  /* 06 */  0,
+  /* 07 */  0,
+  /* 08 */  0,
+  /* 09 */  0,
+  /* 10 */  0,
+  /*Stack segment*/
 
 };
 
 
 
 /* Registers */
+static int SP = DATA_SIZE + (CODE_AMOUNT*INSTRUCTION_SIZE) + STACK_SIZE;
 static int IP = DATA_SIZE;
+static int LR = 0;
 static unsigned char IR[INSTRUCTION_SIZE] = {0, 0, 0};
 static int OUTPUT = 0;
 
@@ -468,7 +493,38 @@ int opcode_ntm(unsigned char left_operand, unsigned char right_operand){
     return memory[left_operand];
 }
 
+int opcode_psh(unsigned char left_operand, unsigned char right_operand){
+    if(SP <= DATA_SIZE + (CODE_AMOUNT * 3)){
+        printf("erorr\n");
+         exit(0);
+    }
+    memory[SP] = left_operand;
 
+    SP = SP - 1;
+
+    return memory[SP + 1];
+}
+
+int opcode_pop(unsigned char left_operand, unsigned char right_operand){
+    if(SP > DATA_SIZE + (CODE_AMOUNT*INSTRUCTION_SIZE) + STACK_SIZE){
+        printf("erorr\n");
+         exit(0);
+    }
+    SP = SP + 1;
+
+    return memory[SP];
+}
+
+int opcode_cal(unsigned char left_operand, unsigned char right_operand){
+    LR = IP;
+    IP = left_operand;
+    return left_operand;
+}
+
+int opcode_ret(unsigned char left_operand, unsigned char right_operand){
+    IP = LR;
+    return IP;
+}
 
 static const opcode_function_t opcode_functions[INSTRUCTIONS_COUNT] = {
         opcode_add, opcode_sub, opcode_mul,
@@ -482,6 +538,8 @@ static const opcode_function_t opcode_functions[INSTRUCTIONS_COUNT] = {
         opcode_mlm, opcode_mdm, opcode_dvm,
         opcode_ndm, opcode_orm, opcode_xom,
         opcode_slm, opcode_srm, opcode_ntm,
+        opcode_psh, opcode_pop, opcode_cal,
+        opcode_ret,
 };
 
 
