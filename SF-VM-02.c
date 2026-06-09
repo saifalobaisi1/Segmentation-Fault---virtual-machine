@@ -35,11 +35,16 @@ typedef int(*opcode_function_t)(unsigned char, unsigned char);
 #define OPCODE_MLM  24
 #define OPCODE_MDM  25
 #define OPCODE_DVM  26
-
+#define OPCODE_NDM  27
+#define OPCODE_ORM  28
+#define OPCODE_XOM  29
+#define OPCODE_SLM  30
+#define OPCODE_SRM  31
+#define OPCODE_NTM  32
 
 #define DATA_SIZE             10
 #define PROGRAM_SIZE          sizeof(memory)
-#define INSTRUCTIONS_COUNT    27
+#define INSTRUCTIONS_COUNT    33
 #define INSTRUCTION_SIZE      3
 
 #define LEFT_OPERAND  IP + 1
@@ -274,7 +279,7 @@ int opcode_jg(unsigned char left_operand, unsigned char right_operand){
 
 int opcode_jle(unsigned char left_operand, unsigned char right_operand){
 
-    if( FLAGS == FLAG_NEGATIVE || FLAGS == FLAG_ZERO){
+    if( FLAGS == FLAG_NEGATIVE | FLAGS == FLAG_ZERO){
         IP = left_operand;
         return left_operand;
     }
@@ -397,6 +402,73 @@ int opcode_dvm(unsigned char left_operand, unsigned char right_operand){
     return memory[left_operand];
 }
 
+int opcode_ndm(unsigned char left_operand, unsigned char right_operand){
+    if(left_operand >= DATA_SIZE){
+        printf("error: this data doesn't exist\n");
+        exit(0);
+    }
+
+    memory[left_operand] = memory[left_operand] & right_operand;
+
+    return memory[left_operand];
+}
+
+int opcode_orm(unsigned char left_operand, unsigned char right_operand){
+    if(left_operand >= DATA_SIZE){
+        printf("error: this data doesn't exist\n");
+        exit(0);
+    }
+
+    memory[left_operand] = memory[left_operand] | right_operand;
+
+    return memory[left_operand];
+}
+
+int opcode_xom(unsigned char left_operand, unsigned char right_operand){
+    if(left_operand >= DATA_SIZE){
+        printf("error: this data doesn't exist\n");
+        exit(0);
+    }
+
+    memory[left_operand] = memory[left_operand] ^ right_operand;
+
+    return memory[left_operand];
+}
+
+int opcode_slm(unsigned char left_operand, unsigned char right_operand){
+    if(left_operand >= DATA_SIZE){
+        printf("error: this data doesn't exist\n");
+        exit(0);
+    }
+
+    memory[left_operand] = memory[left_operand] << right_operand;
+
+    return memory[left_operand];
+}
+
+int opcode_srm(unsigned char left_operand, unsigned char right_operand){
+    if(left_operand >= DATA_SIZE){
+        printf("error: this data doesn't exist\n");
+        exit(0);
+    }
+
+    memory[left_operand] = memory[left_operand] >> right_operand;
+
+    return memory[left_operand];
+}
+
+int opcode_ntm(unsigned char left_operand, unsigned char right_operand){
+    if(left_operand >= DATA_SIZE){
+        printf("error: this data doesn't exist\n");
+        exit(0);
+    }
+
+    memory[left_operand] = ~memory[left_operand];
+
+    return memory[left_operand];
+}
+
+
 
 static const opcode_function_t opcode_functions[INSTRUCTIONS_COUNT] = {
         opcode_add, opcode_sub, opcode_mul,
@@ -408,6 +480,8 @@ static const opcode_function_t opcode_functions[INSTRUCTIONS_COUNT] = {
         opcode_jge, opcode_ldm, opcode_sti, 
         opcode_str, opcode_adm, opcode_sbm, 
         opcode_mlm, opcode_mdm, opcode_dvm,
+        opcode_ndm, opcode_orm, opcode_xom,
+        opcode_slm, opcode_srm, opcode_ntm,
 };
 
 
