@@ -4,6 +4,14 @@
 
 typedef int(*opcode_function_t)(unsigned char, unsigned char);
 
+typedef struct ELEMENT{
+
+unsigned char offset;
+unsigned char size;
+bool used;
+
+} ELEMENT;
+
 #define OPCODE_ADD  0
 #define OPCODE_SUB  1
 #define OPCODE_MUL  2
@@ -46,6 +54,7 @@ typedef int(*opcode_function_t)(unsigned char, unsigned char);
 #define OPCODE_CAL  35
 #define OPCODE_RET  36
 
+#define HEAP_SIZE             10
 #define DATA_SIZE             10
 #define CODE_AMOUNT           9
 #define STACK_SIZE            10
@@ -58,6 +67,8 @@ typedef int(*opcode_function_t)(unsigned char, unsigned char);
 
 #define RX_COUNT 4
 
+static ELEMENT elements[HEAP_SIZE];
+static int EC = 0;
 
 static unsigned char memory [] = {
 
@@ -78,13 +89,26 @@ static unsigned char memory [] = {
   /* 10 */  0,  9,   7,    /* ADD  9,   7   */
   /* 13 */  1,  8,   4,    /* SUB  8,   4   */
   /* 12 */  2,  2,   5,    /* MUL  2,   5   */
-  /* 13 */  22, 5,   10,    /* MUL  2,   5   */
-  /* 14 */  23, 5,   4,    /* MUL  2,   5   */
-  /* 15 */  24, 5,   2,    /* MUL  2,   5   */
+  /* 13 */  22, 5,   10,    /* ADM  2,   5   */
+  /* 14 */  23, 5,   4,    /* SBM  2,   5   */
+  /* 15 */  24, 5,   2,    /* MLM  2,   5   */
   /* 16 */  25, 5,   2,    /* MUL  2,   5   */
   /* 13 */  22, 5,   10,    /* MUL  2,   5   */
   /* 13 */  26, 5,   2,    /* MUL  2,   5   */
   /*Code segment*/
+
+  /*Heap segment*/
+  /* 01 */  0,
+  /* 02 */  0,
+  /* 03 */  0,
+  /* 04 */  0,
+  /* 05 */  0,
+  /* 06 */  0,
+  /* 07 */  0,
+  /* 08 */  0,
+  /* 09 */  0,
+  /* 10 */  0,
+   /*Heap segment*/
 
   /*Stack segment*/
   /* 01 */  0,
@@ -104,20 +128,24 @@ static unsigned char memory [] = {
 
 
 /* Registers */
-static int SP = DATA_SIZE + (CODE_AMOUNT*INSTRUCTION_SIZE) + STACK_SIZE;
+static int HP = DATA_SIZE + (CODE_AMOUNT*INSTRUCTION_SIZE);
+const  int HB = DATA_SIZE + (CODE_AMOUNT*INSTRUCTION_SIZE); 
+static int SP = DATA_SIZE + (CODE_AMOUNT*INSTRUCTION_SIZE) + HEAP_SIZE + STACK_SIZE;
 static int IP = DATA_SIZE;
-static int LR = 0;
 static unsigned char IR[INSTRUCTION_SIZE] = {0, 0, 0};
 static int OUTPUT = 0;
 
 static unsigned char FLAGS = 0;
 
 #define FLAG_POSITIVE 0
-#define FLAG_ZERO     1
+#define FLAG_ZERO     1 
 #define FLAG_NEGATIVE 2
+#define FLAG_OVERFLOW 4
+
+
 
 /* 0000 0000 */
-/* xxxx xxNZ */
+/* xxxx xONZ */
 
 static unsigned char R0 = 0;
 static unsigned char R1 = 0;
@@ -257,6 +285,9 @@ int opcode_cmp(unsigned char left_operand, unsigned char right_operand){
         FLAGS = FLAG_NEGATIVE;
     }else if (OUTPUT > 0){
         FLAGS = FLAG_POSITIVE;
+    }
+    else if (OUTPUT > 255){
+        FLAGS = FLAG_OVERFLOW;
     }
 
     return FLAGS;
@@ -494,7 +525,7 @@ int opcode_ntm(unsigned char left_operand, unsigned char right_operand){
 }
 
 int opcode_psh(unsigned char left_operand, unsigned char right_operand){
-    if(SP <= DATA_SIZE + (CODE_AMOUNT * 3)){
+    if(SP <= DATA_SIZE + (CODE_AMOUNT * 3) + HEAP_SIZE){
         printf("erorr\n");
          exit(0);
     }
@@ -506,7 +537,7 @@ int opcode_psh(unsigned char left_operand, unsigned char right_operand){
 }
 
 int opcode_pop(unsigned char left_operand, unsigned char right_operand){
-    if(SP > DATA_SIZE + (CODE_AMOUNT*INSTRUCTION_SIZE) + STACK_SIZE){
+    if(SP > DATA_SIZE + (CODE_AMOUNT*INSTRUCTION_SIZE) + HEAP_SIZE + STACK_SIZE){
         printf("erorr\n");
          exit(0);
     }
@@ -516,14 +547,64 @@ int opcode_pop(unsigned char left_operand, unsigned char right_operand){
 }
 
 int opcode_cal(unsigned char left_operand, unsigned char right_operand){
-    LR = IP;
+   if(SP <= DATA_SIZE + (CODE_AMOUNT * 3) + HEAP_SIZE){
+        printf("erorr\n");
+         exit(0);
+    }
+    memory[SP] = IP;
+
+    SP = SP - 1;
+
     IP = left_operand;
+
     return left_operand;
 }
 
 int opcode_ret(unsigned char left_operand, unsigned char right_operand){
-    IP = LR;
+    IP = memory[SP];
+
+    if(SP > DATA_SIZE + (CODE_AMOUNT*INSTRUCTION_SIZE) + HEAP_SIZE + STACK_SIZE){
+        printf("erorr\n");
+         exit(0);
+    }
+    SP = SP + 1;
+
     return IP;
+}
+
+int opcode_allocate(unsigned char left_operand, unsigned char right_operand){
+    ELEMENT element;
+    element.offset = HP;
+    element.size = left_operand;
+    element.used = true;
+
+    for(int i = 0; i < EC; i++){
+        if(elements[i].size >= element.size && elements[i].used == false){
+            element.offset = elements[i].offset;
+            elements[i].size = element.size;
+            elements[i].used = true;
+            return element.offset;
+        }
+    }
+
+    if(HP + element.size > DATA_SIZE + (CODE_AMOUNT*INSTRUCTION_SIZE) + HEAP_SIZE){
+        printf("error\n");
+        exit(0);
+    }
+    elements[EC] = element;
+    EC++;
+    HP = HP + element.size;
+    return element.offset;
+}
+
+int opcode_free(unsigned char left_operand, unsigned char right_operand){  
+    for(int i = 0; i < EC; i++){
+        if(elements[i].offset == left_operand){
+            elements[i].used = false;
+            return 0;
+        }
+    }
+    return 255;
 }
 
 static const opcode_function_t opcode_functions[INSTRUCTIONS_COUNT] = {
@@ -545,7 +626,7 @@ static const opcode_function_t opcode_functions[INSTRUCTIONS_COUNT] = {
 
 static bool cpu_fetch(void){
     int byte = 0;
-    if(IP >= PROGRAM_SIZE){
+    if(IP >= DATA_SIZE + (CODE_AMOUNT * 3)){
         /* HALT */
         exit(0);
     }
@@ -562,7 +643,7 @@ static bool cpu_fetch(void){
 }
 
 static bool cpu_decode(void){
-    if(IR[0] >= INSTRUCTIONS_COUNT){
+    if(IR[0] >= INSTRUCTIONS_COUNT){ 
         printf("Invalid instruction\n");
         // IR[0] = 10; // rewrite
         IR[0] = IR[1] = IR[2] = 0;
@@ -590,6 +671,4 @@ int main(void){
         cpu_execute();
         printf("output -> %d\n", OUTPUT);
     }
-
-    return 0;
 }
